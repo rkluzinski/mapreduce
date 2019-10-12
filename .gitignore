@@ -1,0 +1,9 @@
+// vscode
+.vscode
+
+// eclass downloads
+a2-startercode/
+test/
+
+//build dir
+bin/
