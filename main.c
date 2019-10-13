@@ -2,15 +2,13 @@
 #define _GNU_SOURCE
 #endif
 
-#include <unistd.h>
-
-#include <iostream>
-
-// TODO rewrite test using C++
-
+#include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+
+#include <unistd.h>
 
 #include "mapreduce.h"
 #include "threadpool.h"
@@ -42,23 +40,33 @@
 //     fclose(fp);
 // }
 
-void helloWorld(void *arg) {
-    std::cout << "Hello, World!" << std::endl;
-    //sleep(1);
+const int NUM_WORKERS = 8;
+const int NUM_TASKS = 16;
+
+// prevents stdout from being mangled
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void workerHello(void *arg) {
+    pthread_mutex_lock(&mutex);
+    puts("Worker: Hello, World!");
+    pthread_mutex_unlock(&mutex);
+    sleep(1); // simulate computations
 }
 
 int main(int argc, char *argv[]) {
     //MR_Run(argc - 1, &(argv[1]), Map, 10, Reduce, 10);
 
-    std::cerr << "create threadpool" << std::endl;
-    ThreadPool threadpool(4);
+    puts("Master: Hello, World!");
+    ThreadPool_t *threadpool = ThreadPool_create(NUM_WORKERS);
+
+    for (int i = 0; i < NUM_TASKS; i++) {
+        ThreadPool_add_work(threadpool, workerHello, NULL);
+    }
 
     usleep(1000);
 
-    std::cerr << "add work to threadpool" << std::endl;
-    for (int i = 0; i < 4; i++) {
-        threadpool.addWork(helloWorld, NULL);
-    }
+    ThreadPool_destroy(threadpool);
+    pthread_mutex_destroy(&mutex);
 
     return 0;
 }

@@ -1,2 +1,3 @@
 # mapreduce
-A threadpool and map reduce library written in C++
+A threadpool and map-reduce library written in C
+

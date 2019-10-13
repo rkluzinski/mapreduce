@@ -1,16 +1,16 @@
-
 EXE 		= wordcount
-CXX 		= g++
-CXXFLAGS 	= -Wall -Werror -std=c++14 -O0 -g
+CC	 		= gcc
+CCFLAGS 	= -Wall -Werror -pthread -O0 -g
 LDFLAGS 	= -pthread
 
 BIN			= bin
-SOURCES		= $(wildcard *.cpp)
-OBJECTS		= $(SOURCES:%.cpp=$(BIN)/%.o)
+SOURCES		= $(wildcard *.c)
+OBJECTS		= $(SOURCES:%.c=$(BIN)/%.o)
+TESTS		= $(wildcard test/*.c)
 
 .PHONY: all clean
 
-all: $(BIN) $(BIN)/$(EXE)
+all: $(BIN) $(EXE)
 
 clean:
 	rm -rf $(BIN)
@@ -18,9 +18,9 @@ clean:
 $(BIN):
 	mkdir -p $@
 
-$(BIN)/$(EXE): $(OBJECTS)
-	$(CXX) -o $@ $^ $(LDFLAGS)
+$(EXE): $(OBJECTS)
+	$(CC) -o $(BIN)/$@ $^ $(LDFLAGS)
 	@echo "Build successful"
 
-$(OBJECTS): $(BIN)/%.o: %.cpp
-	$(CXX) -o $@ -c $< $(CXXFLAGS)
+$(OBJECTS): $(BIN)/%.o: %.c
+	$(CC) -o $@ -c $< $(CCFLAGS)
