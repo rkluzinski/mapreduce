@@ -8,8 +8,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <unistd.h>
-
 #include "mapreduce.h"
 #include "threadpool.h"
 
@@ -50,7 +48,6 @@ void workerHello(void *arg) {
     pthread_mutex_lock(&mutex);
     puts("Worker: Hello, World!");
     pthread_mutex_unlock(&mutex);
-    sleep(1); // simulate computations
 }
 
 int main(int argc, char *argv[]) {
@@ -62,8 +59,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < NUM_TASKS; i++) {
         ThreadPool_add_work(threadpool, workerHello, NULL);
     }
-
-    usleep(1000);
 
     ThreadPool_destroy(threadpool);
     pthread_mutex_destroy(&mutex);

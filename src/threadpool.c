@@ -3,11 +3,11 @@
 /**
  * A C style constructor for a ThreadPool_work object
  * Parameters:
- *     func - A function pointer to be executed
- *     arg - The arguments to the function pointer
+ *      func - A function pointer to be executed
+ *      arg - The arguments to the function pointer
  * Return:
- *     ThreadPool_work_t* - The pointer the new ThreadPool_work object
- *     NULL - If failed to allocate memory
+ *      ThreadPool_work_t* - The pointer the new ThreadPool_work object
+ *      NULL - If failed to allocate memory
  */
 ThreadPool_work_t *ThreadPool_work_create(thread_func_t func, void *arg) {
     typedef ThreadPool_work_t work_t;
@@ -27,7 +27,7 @@ ThreadPool_work_t *ThreadPool_work_create(thread_func_t func, void *arg) {
 /**
  * A C style destructor for a ThreadPool_work object
  * Parameters:
- *     work - The pointer the ThreadPool_work bbject
+ *      work - The pointer the ThreadPool_work bbject
  */
 void ThreadPool_work_destroy(ThreadPool_work_t *work) {
     free(work);
@@ -36,7 +36,7 @@ void ThreadPool_work_destroy(ThreadPool_work_t *work) {
 /**
 * A C style constructor for creating a new ThreadPool_work_queue object
 * Return:
-*     ThreadPool_work_queue_t* - The pointer to the new ThreadPool_work_queue
+*       ThreadPool_work_queue_t* - The pointer to the new ThreadPool_work_queue
 */
 ThreadPool_work_queue_t *ThreadPool_work_queue_create() {
     typedef ThreadPool_work_queue_t work_queue_t;
@@ -58,7 +58,7 @@ ThreadPool_work_queue_t *ThreadPool_work_queue_create() {
 /**
 * A C style destructor to destroy a ThreadPool_work_queue
 * Parameters:
-*     work_queue - The pointer to the ThreadPool_work_queue to be destroyed
+*       work_queue - The pointer to the ThreadPool_work_queue to be destroyed
 */
 void ThreadPool_work_queue_destroy(ThreadPool_work_queue_t *work_queue) {
     // free any remaining nodes before deleting
@@ -75,11 +75,10 @@ void ThreadPool_work_queue_destroy(ThreadPool_work_queue_t *work_queue) {
 /**
  * Push a new ThreadPool_work object to the back of a ThreadPool_work_queue
  * Parameters:
- *     work_queue - The pointer to a ThreadPool_work_queue_t
- *     work - The pointer the ThreadPool_work_t to be pushed
+ *      work_queue - The pointer to a ThreadPool_work_queue_t
+ *      work - The pointer the ThreadPool_work_t to be pushed
  */
 void ThreadPool_work_queue_push(ThreadPool_work_queue_t *work_queue, ThreadPool_work_t *work) {
-    // TODO make threadsafe
     // TODO error handling
 
     // if pushing the first item
@@ -98,13 +97,11 @@ void ThreadPool_work_queue_push(ThreadPool_work_queue_t *work_queue, ThreadPool_
 /**
  * Pop a ThreadPool_work object from the front of a ThreadPool_work_queue
  * Parameters:
- *     work_queue - The pointer to a ThreadPool_work_queue_t
+ *      work_queue - The pointer to a ThreadPool_work_queue_t
  * Return:
- *     ThreadPool_work_t* - The pointer to the ThreadPool_work object
+ *      ThreadPool_work_t* - The pointer to the ThreadPool_work object
  */
 ThreadPool_work_t *ThreadPool_work_queue_pop(ThreadPool_work_queue_t *work_queue) {
-    //TODO make threadsafe
-
     ThreadPool_work_t *work = work_queue->head;
 
     // if popping last item in queue
@@ -122,10 +119,10 @@ ThreadPool_work_t *ThreadPool_work_queue_pop(ThreadPool_work_queue_t *work_queue
 /**
  * Check if a ThreadPool_work_queue object is empty
  * Parameters:
- *     work_queue - The ThreadPool_work_queue to check
+ *      work_queue - The ThreadPool_work_queue to check
  * Returns:
- *     true - If the ThreadPool_work_queue is empty
- *     false - Otherwise
+ *      true - If the ThreadPool_work_queue is empty
+ *      false - Otherwise
  */
 bool ThreadPool_work_queue_empty(ThreadPool_work_queue_t *work_queue) {
     // TODO make thread safe
@@ -133,16 +130,48 @@ bool ThreadPool_work_queue_empty(ThreadPool_work_queue_t *work_queue) {
     return (work_queue->head == NULL);
 }
 
-// function prototype for thread_entry
-// MAY be removed later
-void *Thread_entry(void *arg);
+/**
+ * Thread entry point
+ * Paramters:
+ *      arg - Void pointer to ThreadPool object
+ * Returns:
+ *      NULL
+ */
+void *Thread_entry(void *arg) {
+    bool thread_running = true;
+    ThreadPool_t *threadpool = (ThreadPool_t *) arg;
+    
+    while (thread_running) {
+        pthread_mutex_lock(&threadpool->mutex);
+        
+        if (!ThreadPool_work_queue_empty(threadpool->work_queue)) {
+            ThreadPool_work_t *work = ThreadPool_work_queue_pop(threadpool->work_queue);
+            pthread_mutex_unlock(&threadpool->mutex);
+            
+            work->func(work->arg);
+            ThreadPool_work_destroy(work);
+        }
+        else {
+            if (!threadpool->running) {
+                thread_running = false;
+            }
+            else {
+                pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
+            }
+
+            pthread_mutex_unlock(&threadpool->mutex);
+        }
+    }
+
+    return NULL;
+}
 
 /**
 * A C style constructor for creating a new ThreadPool object
 * Parameters:
-*     num - The number of threads to create
+*       num - The number of threads to create
 * Return:
-*     ThreadPool_t* - The pointer to the newly created ThreadPool object
+*       ThreadPool_t* - The pointer to the newly created ThreadPool object
 */
 ThreadPool_t *ThreadPool_create(int num) {
     ThreadPool_t *threadpool = (ThreadPool_t *) malloc(sizeof(ThreadPool_t));
@@ -177,12 +206,11 @@ ThreadPool_t *ThreadPool_create(int num) {
 /**
 * A C style destructor to destroy a ThreadPool object
 * Parameters:
-*     tp - The pointer to the ThreadPool object to be destroyed
+*       tp - The pointer to the ThreadPool object to be destroyed
 */
 void ThreadPool_destroy(ThreadPool_t *threadpool) {
-    threadpool->running = false;
-    
     pthread_mutex_lock(&threadpool->mutex);
+    threadpool->running = false;
     pthread_cond_broadcast(&threadpool->not_empty);
     pthread_mutex_unlock(&threadpool->mutex);
 
@@ -203,12 +231,12 @@ void ThreadPool_destroy(ThreadPool_t *threadpool) {
 /**
 * Add a task to the ThreadPool's task queue
 * Parameters:
-*     tp   - The ThreadPool object to add the task to
-*     func - The function pointer that will be called in the thread
-*     arg  - The arguments for the function
+*       tp   - The ThreadPool object to add the task to
+*       func - The function pointer that will be called in the thread
+*       arg  - The arguments for the function
 * Return:
-*     true  - If successful
-*     false - Otherwise
+*       true  - If successful
+*       false - Otherwise
 */
 bool ThreadPool_add_work(ThreadPool_t *threadpool, thread_func_t func, void *arg) {
     ThreadPool_work_t *work = ThreadPool_work_create(func, arg);
@@ -228,56 +256,22 @@ bool ThreadPool_add_work(ThreadPool_t *threadpool, thread_func_t func, void *arg
 /**
 * Get a task from the given ThreadPool object
 * Parameters:
-*     tp - The ThreadPool object being passed
+*       tp - The ThreadPool object being passed
 * Return:
-*     ThreadPool_work_t* - The next task to run
-*     NULL - If work queue is empty
+*       ThreadPool_work_t* - The next task to run
+*       NULL - If work queue is empty
 */
 ThreadPool_work_t *ThreadPool_get_work(ThreadPool_t *threadpool) {
-    ThreadPool_work_t *work = NULL;
-
-    pthread_mutex_lock(&threadpool->mutex);
-    if (!ThreadPool_work_queue_empty(threadpool->work_queue)) {
-        work = ThreadPool_work_queue_pop(threadpool->work_queue);
-    }
-    pthread_mutex_unlock(&threadpool->mutex);
-
-    // return NULL if work queue is empty
-    return work;
+    return NULL;
 }
 
 /**
 * Run the next task from the task queue
 * Parameters:
-*     tp - The ThreadPool Object this thread belongs to
+*       tp - The ThreadPool Object this thread belongs to
+* Returns:
+*       NULL
 */
 void *Thread_run(ThreadPool_t *threadpool) {
-    return NULL;
-}
-
-/**
- * Thread entry point
- * Temporary - until assignment ThreadPool API is clarified
- */
-void *Thread_entry(void *arg) {
-    ThreadPool_t *threadpool = (ThreadPool_t *) arg;
-    
-    while (true) {
-        ThreadPool_work_t *work = ThreadPool_get_work(threadpool);
-        
-        if (work == NULL) {
-            if (!threadpool->running) {
-                break;
-            }
-
-            pthread_mutex_lock(&threadpool->mutex);
-            pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
-            pthread_mutex_unlock(&threadpool->mutex);
-        }
-        else {
-            work->func(work->arg);
-            ThreadPool_work_destroy(work);
-        }
-    }
     return NULL;
 }
