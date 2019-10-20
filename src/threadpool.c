@@ -138,29 +138,38 @@ bool ThreadPool_work_queue_empty(ThreadPool_work_queue_t *work_queue) {
  *      NULL
  */
 void *Thread_entry(void *arg) {
-    bool thread_running = true;
+    bool running = true;
     ThreadPool_t *threadpool = (ThreadPool_t *) arg;
+    ThreadPool_work_t *work = NULL;
     
-    while (thread_running) {
+    // while the thread is running
+    while (running) {
         pthread_mutex_lock(&threadpool->mutex);
-        
-        if (!ThreadPool_work_queue_empty(threadpool->work_queue)) {
-            ThreadPool_work_t *work = ThreadPool_work_queue_pop(threadpool->work_queue);
+        work = ThreadPool_get_work(threadpool);
+
+        // execute work until the work queue is empty
+        while (work != NULL) {
             pthread_mutex_unlock(&threadpool->mutex);
-            
+
+            // release lock and execute work
             work->func(work->arg);
             ThreadPool_work_destroy(work);
-        }
-        else {
-            if (!threadpool->running) {
-                thread_running = false;
-            }
-            else {
-                pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
-            }
 
-            pthread_mutex_unlock(&threadpool->mutex);
+            // reaquire lock and get next work
+            pthread_mutex_lock(&threadpool->mutex);
+            work = ThreadPool_get_work(threadpool);
         }
+
+        // if threadpool is still running    
+        if (threadpool->running)
+            // wait for more work
+            pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
+        else
+            // stop thread
+            running = false;
+
+        // release lock
+        pthread_mutex_unlock(&threadpool->mutex);
     }
 
     return NULL;
@@ -262,7 +271,13 @@ bool ThreadPool_add_work(ThreadPool_t *threadpool, thread_func_t func, void *arg
 *       NULL - If work queue is empty
 */
 ThreadPool_work_t *ThreadPool_get_work(ThreadPool_t *threadpool) {
-    return NULL;
+    ThreadPool_work_t *work = NULL;
+
+    if (!ThreadPool_work_queue_empty(threadpool->work_queue)) {
+        work = ThreadPool_work_queue_pop(threadpool->work_queue);
+    }
+    
+    return work;
 }
 
 /**
