@@ -12,7 +12,7 @@
 ThreadPool_work_t *ThreadPool_work_create(thread_func_t func, void *arg) {
     typedef ThreadPool_work_t work_t;
     
-    work_t *work = (work_t *) malloc(sizeof(work_t));
+    work_t *work = malloc(sizeof(work_t));
     if (work == NULL) {
         return NULL;
     }
@@ -42,7 +42,7 @@ ThreadPool_work_queue_t *ThreadPool_work_queue_create() {
     typedef ThreadPool_work_queue_t work_queue_t;
     
     // allocate a new ThreadPool_work_queue object
-    work_queue_t *work_queue = (work_queue_t *) malloc(sizeof(work_queue_t));
+    work_queue_t *work_queue = malloc(sizeof(work_queue_t));
     if (work_queue == NULL) {
         perror("ThreadPool_work_queue_create: malloc");
         exit(1);
@@ -138,7 +138,7 @@ bool ThreadPool_work_queue_empty(ThreadPool_work_queue_t *work_queue) {
 *       ThreadPool_t* - The pointer to the newly created ThreadPool object
 */
 ThreadPool_t *ThreadPool_create(int num) {
-    ThreadPool_t *threadpool = (ThreadPool_t *) malloc(sizeof(ThreadPool_t));
+    ThreadPool_t *threadpool = malloc(sizeof(ThreadPool_t));
     if (threadpool == NULL) {
         perror("ThreadPool_create: malloc");
         exit(1);
