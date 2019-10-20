@@ -131,51 +131,6 @@ bool ThreadPool_work_queue_empty(ThreadPool_work_queue_t *work_queue) {
 }
 
 /**
- * Thread entry point
- * Paramters:
- *      arg - Void pointer to ThreadPool object
- * Returns:
- *      NULL
- */
-void *Thread_entry(void *arg) {
-    bool running = true;
-    ThreadPool_t *threadpool = (ThreadPool_t *) arg;
-    ThreadPool_work_t *work = NULL;
-    
-    // while the thread is running
-    while (running) {
-        pthread_mutex_lock(&threadpool->mutex);
-        work = ThreadPool_get_work(threadpool);
-
-        // execute work until the work queue is empty
-        while (work != NULL) {
-            pthread_mutex_unlock(&threadpool->mutex);
-
-            // release lock and execute work
-            work->func(work->arg);
-            ThreadPool_work_destroy(work);
-
-            // reaquire lock and get next work
-            pthread_mutex_lock(&threadpool->mutex);
-            work = ThreadPool_get_work(threadpool);
-        }
-
-        // if threadpool is still running    
-        if (threadpool->running)
-            // wait for more work
-            pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
-        else
-            // stop thread
-            running = false;
-
-        // release lock
-        pthread_mutex_unlock(&threadpool->mutex);
-    }
-
-    return NULL;
-}
-
-/**
 * A C style constructor for creating a new ThreadPool object
 * Parameters:
 *       num - The number of threads to create
@@ -204,8 +159,10 @@ ThreadPool_t *ThreadPool_create(int num) {
     
     // create the workers for threadpool
     for (int i = 0; i < threadpool->num_workers; i++) {
+        // cast Thread_run to avoid warnings
+        typedef void *(*thread_entry)(void *);
         pthread_t thread_id;
-        pthread_create(&thread_id, NULL, Thread_entry, threadpool);
+        pthread_create(&thread_id, NULL, (thread_entry) Thread_run, threadpool);
         threadpool->workers[i] = thread_id;
     }
 
@@ -288,5 +245,38 @@ ThreadPool_work_t *ThreadPool_get_work(ThreadPool_t *threadpool) {
 *       NULL
 */
 void *Thread_run(ThreadPool_t *threadpool) {
+    bool running = true;
+    ThreadPool_work_t *work = NULL;
+    
+    // while the thread is running
+    while (running) {
+        pthread_mutex_lock(&threadpool->mutex);
+        work = ThreadPool_get_work(threadpool);
+
+        // execute work until the work queue is empty
+        while (work != NULL) {
+            pthread_mutex_unlock(&threadpool->mutex);
+
+            // release lock and execute work
+            work->func(work->arg);
+            ThreadPool_work_destroy(work);
+
+            // reaquire lock and get next work
+            pthread_mutex_lock(&threadpool->mutex);
+            work = ThreadPool_get_work(threadpool);
+        }
+
+        // if threadpool is still running    
+        if (threadpool->running)
+            // wait for more work
+            pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
+        else
+            // stop thread
+            running = false;
+
+        // release lock
+        pthread_mutex_unlock(&threadpool->mutex);
+    }
+
     return NULL;
 }
