@@ -267,12 +267,14 @@ void *Thread_run(ThreadPool_t *threadpool) {
         }
 
         // if threadpool is still running    
-        if (threadpool->running)
+        if (threadpool->running) {
             // wait for more work
             pthread_cond_wait(&threadpool->not_empty, &threadpool->mutex);
-        else
+        }
+        else {
             // stop thread
             running = false;
+        }
 
         // release lock
         pthread_mutex_unlock(&threadpool->mutex);

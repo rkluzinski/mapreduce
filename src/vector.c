@@ -1,7 +1,7 @@
 #include "stdlib.h"     //for malloc, realloc and free
 #include "vector.h"
 
-#define INITIAL_CAPACITY 32
+#define INITIAL_CAPACITY 8
 
 /**
  * A C style constructor for a Vector object
@@ -11,9 +11,11 @@
 Vector_t *Vector_create() {
     Vector_t *vector = (Vector_t *) malloc(sizeof(Vector_t));
 
-    vector->size = 0;
-    vector->capacity = INITIAL_CAPACITY;
-    vector->data = malloc(sizeof(vector_data_t) * vector->capacity);
+    if (vector != NULL) {
+        vector->size = 0;
+        vector->capacity = INITIAL_CAPACITY;
+        vector->data = malloc(sizeof(vector_data_t) * vector->capacity);
+    }
 
     return vector;
 }

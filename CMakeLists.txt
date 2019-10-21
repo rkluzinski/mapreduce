@@ -32,8 +32,12 @@ add_executable(test_vector test/vector.c)
 target_link_libraries(test_vector PRIVATE vector)
 
 # hash table library
+add_library(hashtable STATIC src/hashtable.c src/hashtable.h)
+target_link_libraries(hashtable PUBLIC vector)
 
 # hash table tests
+add_executable(test_hashtable test/hashtable.c)
+target_link_libraries(test_hashtable PRIVATE hashtable)
 
 # wordcount executable
 add_executable(wordcount wordcount/distw.c)

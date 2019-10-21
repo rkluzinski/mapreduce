@@ -29,6 +29,7 @@ void MR_Emit(char *key, char *value);
 
 /**
  * Assigns a key to a partition using a hash function
+ * Uses DJB2 hashing algorithm provided with assignment spec
  * Parameters:
  *      key - The key to hash
  *      num_partitions - The total number of partitions

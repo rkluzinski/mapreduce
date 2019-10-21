@@ -101,13 +101,14 @@ void MR_Emit(char *key, char *value) {
 
 /**
  * Assigns a key to a partition using a hash function
+ * Uses DJB2 hashing algorithm provided with assignment spec
  * Parameters:
  *      key - The key to hash
  *      num_partitions - The total number of partitions
  */
 unsigned long MR_Partition(char *key, int num_partitions) {
     unsigned long hash = 5381;
-    for (char c = *key; *key != 0; key++) {
+    for (int c = *key; *key != 0; key++) {
         hash = hash * 33 + c;
     }
     return hash % num_partitions;
