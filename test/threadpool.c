@@ -34,7 +34,7 @@ void test_wait_between_work(int num_workers, int num_tasks) {
         ThreadPool_add_work(threadpool, mock_work, NULL);
     }
 
-    sleep(1);
+    usleep(1000);
 
     for (int i = 0; i < num_tasks; i++) {
         ThreadPool_add_work(threadpool, mock_work, NULL);
@@ -51,9 +51,10 @@ int main(int argc, char *argv[]) {
     test_threadpool(1, 1);
     test_threadpool(8, 8);
     test_threadpool(8, 256);
-    test_threadpool(8, 1024 * 1024);
+    test_threadpool(8, 128 * 1024);
     test_threadpool(256, 64);
     test_wait_between_work(8, 256);
+    test_wait_between_work(8, 1);
 
     pthread_mutex_destroy(&mutex);
     fputs("Passed \n", stdout);

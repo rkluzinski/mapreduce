@@ -40,5 +40,5 @@ add_executable(test_hashtable test/hashtable.c)
 target_link_libraries(test_hashtable PRIVATE hashtable)
 
 # wordcount executable
-add_executable(wordcount wordcount/distw.c)
+add_executable(wordcount src/distw.c)
 target_link_libraries(wordcount PRIVATE mapreduce)

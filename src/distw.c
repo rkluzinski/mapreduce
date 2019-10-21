@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "../src/mapreduce.h"
+#include "mapreduce.h"
 
 void Map(char *file_name) {
     FILE *fp = fopen(file_name, "r");

@@ -1,0 +1,4 @@
+bin/test_queue
+bin/test_threadpool
+bin/test_vector
+bin/test_hashtable

@@ -1,9 +1,11 @@
 // vscode
 .vscode
 
-// eclass downloads
+// starter code
 a2-startercode/
-data/
+
+// eClass test data
+test-wordcount
 
 // build dir
 bin/
