@@ -5,7 +5,7 @@
 
 void test_growth() {
     const int num_items = 1024;
-    vector_data_t mock_item = "Hello, World";
+    vec_data_t mock_item = "Hello, World";
 
     Vector_t *vector = Vector_create();
 
@@ -20,7 +20,7 @@ void test_growth() {
 
 void test_access() {
     const int num_items = 5;
-    vector_data_t mock_item_list[] = {
+    vec_data_t mock_item_list[] = {
         "1", "2", "3", "4", "5"
     };
 
@@ -33,7 +33,7 @@ void test_access() {
     assert(Vector_size(vector) == num_items);
 
     for (int i = 0; i < num_items; i++) {
-        vector_data_t item = Vector_get(vector, i);
+        vec_data_t item = Vector_get(vector, i);
         assert(item == mock_item_list[i]);
     }
 

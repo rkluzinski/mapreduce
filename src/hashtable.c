@@ -2,8 +2,10 @@
 #include <string.h>
 #include "hashtable.h"
 
-#define INITIAL_CAPACITY 8
-#define RESIZE_THRESHHOLD (double) 0.75
+// global constants
+const static int INITIAL_CAPACITY = 8;
+const static double GROWTH_THRESHHOLD = 0.75;
+const ht_value_t key_not_in_table = NULL;
 
 /**
  * A C style constructor for Node
@@ -12,16 +14,12 @@
  * Returns:
  *      The pointer to the new Node object
  */
-Node_t *Node_create(char *key) {
+Node_t *Node_create(ht_key_t key, ht_value_t value) {
     Node_t *node = malloc(sizeof(Node_t));
+    
     if (node != NULL) {
-        node->value = Vector_create();   
-        if (node->value == NULL) {
-            free(node);
-            return NULL;
-        }
-
         node->key = key;
+        node->value = value;
     }
 
     return node;
@@ -33,18 +31,7 @@ Node_t *Node_create(char *key) {
  *      node - The pointer to the Node to destroy
  */
 void Node_destroy(Node_t *node) {
-    Vector_destroy(node->value);
     free(node);
-}
-
-/**
- * Insert a new value to the Node
- * Parameters:
- *      node - The node to insert into
- *      value - The value to insert
- */
-void Node_insert(Node_t *node, char *value) {
-    return Vector_insert(node->value, value);
 }
 
 /**
@@ -77,7 +64,7 @@ HashTable_t *HashTable_create() {
  *      hashtable - The HashTable to be destroyed
  */
 void HashTable_destroy(HashTable_t *hashtable) {
-    // destroy vectors created by HashTable
+    // destroy all nodes created by HashTable
     for (int i = 0; i < hashtable->num_buckets; i++) {
         if (hashtable->buckets[i] != NULL) {
             Node_destroy(hashtable->buckets[i]);
@@ -95,27 +82,29 @@ void HashTable_destroy(HashTable_t *hashtable) {
  *      key - The key to hash
  *      num_buckets - The number of buckets in the table
  */
-size_t HashTable_hash(char *key, size_t num_buckets) {
+size_t HashTable_hash(ht_key_t key, size_t num_buckets) {
     size_t hash = 5381;
     for (size_t c = *key; *key != 0; key++) {
         hash = hash * 33 + c;
     }
+
+    // TODO change to bitmask
     return hash % num_buckets;
 }
 
 /**
- * Find the index of the key, or next availible spot
- * if key cannot be found
+ * Find the index of the bucket that contains the key
+ * or the index of the next open bucket using linear probing
  * Parameters:
  *      hashtable - The HashTable to search
  *      key - The key to search for
  * Returns:
- *      The index of the corresponding bucket
+ *      The index of the bucket with key or empty bucket
  */
-size_t HashTable_find_index(HashTable_t *hashtable, char *key) {
+size_t HashTable_index_of_key(HashTable_t *hashtable, ht_key_t key) {
     size_t index = HashTable_hash(key, hashtable->num_buckets);
 
-    // find key or first empty spot
+    // find key or first empty spot using linear probing
     Node_t **buckets = hashtable->buckets;
     while (buckets[index] != NULL && strcmp(buckets[index]->key, key) != 0) {
         index = ++index % hashtable->num_buckets;
@@ -130,7 +119,7 @@ size_t HashTable_find_index(HashTable_t *hashtable, char *key) {
 }
 
 /**
- * Grows the HashTable
+ * Grows the HashTable by a factor of 2
  * Uses when the load factor exceeds a certain threshhold
  * Parameters:
  *      hashtable - The HashTable to grow
@@ -144,15 +133,16 @@ void HashTable_grow(HashTable_t *hashtable) {
     hashtable->num_buckets *= 2;
     hashtable->buckets = calloc(sizeof(Node_t), hashtable->num_buckets);
 
-    // copy nodes to new array
+    // copy nodes from olf 
     for (size_t i = 0; i < previous_size; i++) {
         if (buckets[i] != NULL) {
             Node_t *node = buckets[i];
-            size_t index = HashTable_find_index(hashtable, node->key);
+            size_t index = HashTable_index_of_key(hashtable, node->key);
             hashtable->buckets[index] = node;
         }
     }
 
+    // free the old arrya
     free(buckets);
 }
 
@@ -163,27 +153,27 @@ void HashTable_grow(HashTable_t *hashtable) {
  *      hashtable - The HashTable to insert the key to
  *      key - The key to insert the item to
  *      value - The value to insert
+ * Returns:
+ *      0 on success, -1 on failure
  */
-int HashTable_insert(HashTable_t *hashtable, char *key, char *value) {
+int HashTable_insert(HashTable_t *hashtable, ht_key_t key, ht_value_t value) {
     Node_t **buckets = hashtable->buckets;
-    size_t index = HashTable_find_index(hashtable, key);
+    size_t index = HashTable_index_of_key(hashtable, key);
 
     // if key did not exist, create new node
     if (buckets[index] == NULL) {
         ++hashtable->unique_keys;
-        buckets[index] = Node_create(key);
+        buckets[index] = Node_create(key, value);
         
+        // check if bucket was created
         if (buckets[index] == NULL) {
             return -1;
         }
     }
 
-    // insert the value to node
-    Node_insert(buckets[index], value);
-
     // check if table should be grown
     double load_factor = (double) hashtable->unique_keys / (double) hashtable->num_buckets;
-    if (load_factor > RESIZE_THRESHHOLD) {
+    if (load_factor > GROWTH_THRESHHOLD) {
         HashTable_grow(hashtable);
     }
 
@@ -191,20 +181,35 @@ int HashTable_insert(HashTable_t *hashtable, char *key, char *value) {
 }
 
 /**
- * Returns the Vector associated with a given key
+ * Returns the value associated with a given key
+ * Current implementation will just segfault
  * Parameters:
  *      hashtable - The HashTable to search
  *      key - The key to search for
  * Returns:
- *      The Vector associated with the given key
- *      NULL if the key is not found;
+ *      If key was found: value associated with that key
+ *      Otherwise: value defined by key_not_in_table
  */
-Vector_t *HashTable_get(HashTable_t *hashtable, char *key) {
-    size_t index = HashTable_find_index(hashtable, key);
-    if (hashtable->buckets[index] != NULL) {
-        return hashtable->buckets[index]->value;
-    }
-    else {
-        return NULL;
-    }
+ht_value_t HashTable_get(HashTable_t *hashtable, ht_key_t key) {
+    size_t index = HashTable_index_of_key(hashtable, key);
+    return hashtable->buckets[index]->value;
+    // if (hashtable->buckets[index] != NULL) {
+    //     return hashtable->buckets[index]->value;
+    // }
+    // else {
+    //     return NULL;
+    // }
+}
+
+/**
+ * Check if the HashTable contains a given key
+ * Parameters:
+ *      hashtable - The HashTable to search
+ *      key - The key to search for
+ * Returns:
+ *      1 if the key is found, 0 otherwise
+ */
+int HashTable_contains(HashTable_t *hashtable, ht_key_t key) {
+    size_t index = HashTable_index_of_key(hashtable, key);
+    return hashtable->buckets[index] != NULL;
 }

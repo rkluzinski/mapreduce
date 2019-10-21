@@ -2,12 +2,12 @@
 #define VECTOR_H
 
 // Define what the vector will store
-typedef char *vector_data_t;
+typedef char *vec_data_t;
 
 typedef struct {
     size_t size;
     size_t capacity;
-    vector_data_t *data;
+    vec_data_t *data;
 } Vector_t;
 
 /**
@@ -39,7 +39,7 @@ int Vector_size(Vector_t *vector);
  *      vector - The vector to insert to
  *      item - The item to insert
  */
-void Vector_insert(Vector_t *vector, vector_data_t item);
+void Vector_insert(Vector_t *vector, vec_data_t item);
 
 /**
  * Get the item at the given index
@@ -49,6 +49,6 @@ void Vector_insert(Vector_t *vector, vector_data_t item);
  * Returns:
  *      The value of the given item
  */
-vector_data_t Vector_get(Vector_t *vector, int index);
+vec_data_t Vector_get(Vector_t *vector, int index);
 
 #endif

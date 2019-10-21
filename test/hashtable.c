@@ -37,17 +37,17 @@ not necessary, a non-cryptographic hashing function might be preferable.";
 void test_normal_use() {
     HashTable_t *hashtable = HashTable_create();
 
-    HashTable_insert(hashtable, "apple", "1");
-    HashTable_insert(hashtable, "boat", "1");
-    HashTable_insert(hashtable, "cat", "1");
+    HashTable_insert(hashtable, "apple", NULL);
+    HashTable_insert(hashtable, "boat", NULL);
+    HashTable_insert(hashtable, "cat", NULL);
 
-    assert(HashTable_get(hashtable, "apple") != NULL);
-    assert(HashTable_get(hashtable, "boat") != NULL);
-    assert(HashTable_get(hashtable, "cat") != NULL);
+    assert(HashTable_contains(hashtable, "apple") == 1);
+    assert(HashTable_contains(hashtable, "boat") == 1);
+    assert(HashTable_contains(hashtable, "cat") == 1);
 
-    assert(HashTable_get(hashtable, "banana") == NULL);
-    assert(HashTable_get(hashtable, "car") == NULL);
-    assert(HashTable_get(hashtable, "canada") == NULL);
+    assert(HashTable_contains(hashtable, "banana") == 0);
+    assert(HashTable_contains(hashtable, "car") == 0);
+    assert(HashTable_contains(hashtable, "canada") == 0);
 
     HashTable_destroy(hashtable);
 }
@@ -58,18 +58,46 @@ void test_growth() {
     char *message = strdup(g_message);
     char *token, *dummy = message;
     while ((token = strsep(&dummy, " \t\n\r")) != NULL) {
-        HashTable_insert(hashtable, token, "1");
+        HashTable_insert(hashtable, token, NULL);
     }
 
-    assert(HashTable_get(hashtable, "basic") != NULL);
-    assert(HashTable_get(hashtable, "requirement") != NULL);
-    assert(HashTable_get(hashtable, "algorithms") != NULL);
-    assert(HashTable_get(hashtable, "modulo") != NULL);
-    assert(HashTable_get(hashtable, "collisions") != NULL);
-    assert(HashTable_get(hashtable, "malicious") != NULL);
-    assert(HashTable_get(hashtable, "cryptographic") != NULL);
+    assert(HashTable_contains(hashtable, "basic") == 1);
+    assert(HashTable_contains(hashtable, "requirement") == 1);
+    assert(HashTable_contains(hashtable, "algorithms") == 1);
+    assert(HashTable_contains(hashtable, "modulo") == 1);
+    assert(HashTable_contains(hashtable, "collisions") == 1);
+    assert(HashTable_contains(hashtable, "malicious") == 1);
+    assert(HashTable_contains(hashtable, "cryptographic") == 1);
 
     free(message);
+    HashTable_destroy(hashtable);
+}
+
+void test_vector() {
+    HashTable_t *hashtable = HashTable_create();
+
+    Vector_t *vector = Vector_create();
+    Vector_insert(vector, "Edmonton");
+    Vector_insert(vector, "Calgary");
+    HashTable_insert(hashtable, "cities", vector);
+
+    vector = Vector_create();
+    Vector_insert(vector, "Dog");
+    Vector_insert(vector, "Cat");
+    Vector_insert(vector, "Horse");
+    HashTable_insert(hashtable, "animals", vector);
+
+    assert(HashTable_contains(hashtable, "cities") == 1);
+    assert(HashTable_contains(hashtable, "animals") == 1);
+
+    vector = HashTable_get(hashtable, "cities");
+    assert(vector->size == 2);
+    Vector_destroy(vector);
+
+    vector = HashTable_get(hashtable, "animals");
+    assert(vector->size == 3);
+    Vector_destroy(vector);
+
     HashTable_destroy(hashtable);
 }
 
@@ -78,6 +106,7 @@ int main(int argc, char **argv) {
     
     test_normal_use();
     test_growth();
+    test_vector();
 
     fputs("Passed\n", stdout);
     return 0;

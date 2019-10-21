@@ -5,12 +5,20 @@
 #include <stddef.h>     // for size_t
 #include "vector.h"     // for Vector implementation
 
+// HashTable key-value types
+typedef char *ht_key_t;
+typedef Vector_t *ht_value_t;
+
+// what to return when key is not in table
+extern const ht_value_t key_not_in_table;
+
 /**
- * 
+ * Stores a key-value pair
+ * Used to implement HashTable
  */
 typedef struct {
-    char *key;          // stores the key of this bucket
-    Vector_t *value;    // stores the values of this bucket
+    ht_key_t key;       // stores the key of this bucket
+    ht_value_t value;  // stores the values of this bucket
 } Node_t;
 
 /**
@@ -46,18 +54,30 @@ void HashTable_destroy(HashTable_t *hashtable);
  *      hashtable - The HashTable to insert the key to
  *      key - The key to insert the item to
  *      value - The value to insert
+ * Returns:
+ *      0 on success, -1 on failure
  */
-int HashTable_insert(HashTable_t *hashtable, char *key, vector_data_t value);
+int HashTable_insert(HashTable_t *hashtable, ht_key_t key, ht_value_t value);
 
 /**
- * Returns the Vector associated with a given key
+ * Get the value associated with the given key
  * Parameters:
  *      hashtable - The HashTable to search
  *      key - The key to search for
  * Returns:
- *      The Vector associated with the given key
- *      NULL if the key is not found;
+ *      If key was found: value associated with that key
+ *      Otherwise: value defined by key_not_in_table
  */
-Vector_t *HashTable_get(HashTable_t *hashtable, char *key);
+ht_value_t HashTable_get(HashTable_t *hashtable, ht_key_t key);
+
+/**
+ * Check if the HashTable contains a given key
+ * Parameters:
+ *      hashtable - The HashTable to search
+ *      key - The key to search for
+ * Returns:
+ *      1 if the key is found, 0 otherwise
+ */
+int HashTable_contains(HashTable_t *hashtable, ht_key_t key);
 
 #endif
