@@ -53,8 +53,8 @@ void Vector_insert(Vector_t *vector, vec_data_t item) {
     // grow vector if at capacity
     if (vector->size == vector->capacity) {
         vector->capacity *= 2;
-        size_t new_size = sizeof(Vector_t) * vector->capacity;
-        vector->data = realloc(vector->data, new_size);
+        vector->data = realloc(vector->data,
+            sizeof(Vector_t) * vector->capacity);
     }
 }
 

@@ -120,8 +120,8 @@ void HashTable_insert_internal(HashTable_t *hashtable, hkey_t key, hvalue_t valu
     
     // if bucket was empty, insert key
     if (entry->key == bucket_empty) {
-        ++hashtable->num_keys;
         entry->key = key;
+        ++hashtable->num_keys;
     }
 
     // insert value
@@ -140,6 +140,7 @@ void HashTable_grow(HashTable_t *hashtable) {
     Entry_t *old_table = hashtable->table;
 
     // allocate new array
+    hashtable->num_keys = 0;
     hashtable->num_buckets *= 2;
     hashtable->table = calloc(sizeof(Entry_t), hashtable->num_buckets);
 
@@ -188,7 +189,7 @@ int HashTable_insert(HashTable_t *hashtable, hkey_t key, hvalue_t value) {
  */
 hvalue_t HashTable_get(HashTable_t *hashtable, hkey_t key) {
     size_t index = HashTable_lookup(hashtable, key);
-    return hashtable->table[index].value;
+    
     if (hashtable->table[index].key != bucket_empty) {
         return hashtable->table[index].value;
     }
