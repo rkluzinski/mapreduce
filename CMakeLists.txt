@@ -20,10 +20,6 @@ target_link_libraries(test_queue PRIVATE threadpool pthread)
 add_executable(test_threadpool test/threadpool.c)
 target_link_libraries(test_threadpool PRIVATE threadpool pthread)
 
-# mapreduce library
-add_library(mapreduce STATIC src/mapreduce.c src/mapreduce.h)
-target_link_libraries(mapreduce PRIVATE threadpool pthread)
-
 # vector library
 add_library(vector STATIC src/vector.c src/vector.h)
 
@@ -38,6 +34,17 @@ target_link_libraries(hashtable PUBLIC vector)
 # hashtable tests
 add_executable(test_hashtable test/hashtable.c)
 target_link_libraries(test_hashtable PRIVATE hashtable)
+
+# mapreduce library
+add_library(mapreduce STATIC 
+    src/mapreduce.c src/mapreduce.h 
+    src/sort.c src/sort.h
+    src/partition.c src/partition.h)
+target_link_libraries(mapreduce PRIVATE 
+    threadpool 
+    pthread
+    hashtable
+    vector)
 
 # wordcount executable
 add_executable(wordcount src/distw.c)
