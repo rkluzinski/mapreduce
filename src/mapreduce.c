@@ -4,7 +4,6 @@
 #include "mapreduce.h"
 #include "threadpool.h"     // for threadpool implementation
 #include "sort.h"           // for sort_files
-#include "partition.h"      // for threadsafe intermediate data structure
 
 typedef struct {
     size_t position;
