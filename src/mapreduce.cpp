@@ -1,11 +1,7 @@
-#include <iostream>     // for debugging
-
 #include <map>          // for std::multimap
 #include <vector>       // for std::vector
-
 #include <unistd.h>     // for stat syscall
 #include <sys/stat.h>   // for struct stat data type
-
 #include <pthread.h>    // for mutexes
 
 // avoid name mangling C headers library
@@ -15,17 +11,18 @@ extern "C" {
 }
 
 struct MRData {
+    typedef std::multimap<std::string, std::string> partition_t;
+
     std::size_t num_partitions;
-    
     pthread_mutex_t *mutex;
-    std::multimap<std::string, std::string> *partition;
-    std::multimap<std::string, std::string>::iterator *partition_it;
+    partition_t *partition;
+    partition_t::const_iterator *partition_it;
 
     MRData(std::size_t n) {
         num_partitions = n;
         mutex = new pthread_mutex_t[n];
-        partition = new std::multimap<std::string, std::string>[n];
-        partition_it = new std::multimap<std::string, std::string>::iterator[n];
+        partition = new partition_t[n];
+        partition_it = new partition_t::const_iterator[n];
 
         for (std::size_t i = 0; i < num_partitions; i++) {
             pthread_mutex_init(&mutex[i], NULL);
@@ -158,10 +155,10 @@ unsigned long MR_Partition(char *key, int num_partitions) {
  */
 void MR_ProcessPartition(int partition_number) {
     auto &partition = shared_data->partition[partition_number];
-    /* const */ auto &it = shared_data->partition_it[partition_number];
+    auto &it = shared_data->partition_it[partition_number];
     
-    it = partition.begin();
-    while(it != partition.end()) {
+    it = partition.cbegin();
+    while(it != partition.cend()) {
         char *key = (char *) it->first.c_str();
         g_reducer(key, partition_number);
     }
@@ -174,8 +171,8 @@ void MR_ProcessPartition(int partition_number) {
  *      partition_number - The partition number to look in
  */
 char *MR_GetNext(char *key, int partition_number) {
-    /* const */ auto end = shared_data->partition[partition_number].end();
-    /* const */ auto &it = shared_data->partition_it[partition_number];
+    auto end = shared_data->partition[partition_number].cend();
+    auto &it = shared_data->partition_it[partition_number];
 
     if (it != end && it->first.compare(key) == 0) {
         return (char *) (it++)->second.c_str();
