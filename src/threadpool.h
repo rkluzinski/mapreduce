@@ -20,27 +20,22 @@ typedef struct ThreadPool_work_t {
 } ThreadPool_work_t;
 
 /**
- * ThreadPool_work_queue_t is implemented as a singly linked list
+ * ThreadPool_work_queue_t is implemented as a singly-linked list
  * Pushing to and popping from the list are not blocking operations
  */
 typedef struct {
-    ThreadPool_work_t *head;
-    ThreadPool_work_t *tail;
+    ThreadPool_work_t *head;    // the head of the linked list
+    ThreadPool_work_t *tail;    // the tail of the linked list
 } ThreadPool_work_queue_t;
 
 typedef struct {
-    bool running;
-
-    // tracks threads that belong to this threadpool
-    int num_workers;
-    pthread_t *workers;
+    int running;                // is the threadpool running
+    int num_workers;            // number of workers in threadpool
+    pthread_t *workers;         // pointer to array of thread IDs
     
-    // work queue, mutex and condition
-    ThreadPool_work_queue_t *work_queue;
+    ThreadPool_work_queue_t *work_queue;    // the work queue
     pthread_mutex_t mutex;      // mutex for the work queue
-    
-    // TODO change to a more representative name
-    pthread_cond_t not_empty;   // work queue is not empty
+    pthread_cond_t not_empty;   // signal that the work queue is not empty
 } ThreadPool_t;
 
 

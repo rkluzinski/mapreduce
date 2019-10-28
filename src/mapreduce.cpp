@@ -10,30 +10,42 @@ extern "C" {
 #include "threadpool.h"
 }
 
+/**
+ * Holds the intermediate data produced by the Map function
+ * Underlying data type is std::multimap
+ */
 struct MRData {
+    // typedef for 
     typedef std::multimap<std::string, std::string> partition_t;
 
-    std::size_t num_partitions;
-    pthread_mutex_t *mutex;
-    partition_t *partition;
-    partition_t::const_iterator *partition_it;
+    std::size_t num_partitions;     // the number of partitions
+    pthread_mutex_t *mutex;         // the array of mutexes
+    partition_t *partition;         // the array of multimaps 
+    
+    // array of iterators for reduce function 
+    partition_t::const_iterator *partition_it; 
 
     MRData(std::size_t n) {
         num_partitions = n;
+        
+        // allocate memory
         mutex = new pthread_mutex_t[n];
         partition = new partition_t[n];
         partition_it = new partition_t::const_iterator[n];
 
+        // initialize mutexes
         for (std::size_t i = 0; i < num_partitions; i++) {
             pthread_mutex_init(&mutex[i], NULL);
         }
     }
 
     ~MRData() {
+        // destroy mutexes
         for (std::size_t i = 0; i < num_partitions; i++) {
             pthread_mutex_destroy(&mutex[i]);
         }
 
+        // free memory
         delete[] mutex;
         delete[] partition;
         delete[] partition_it;
@@ -49,14 +61,21 @@ MRData *shared_data;
 Reducer g_reducer;
 
 /**
- * 
+ * The work function for reducer threads
+ * Parameters:
+ *      partition_number - A pointer to the parition number argument
  */
-void Reducer_Entry(int *partition_number) {
+void Reducer_work(int *partition_number) {
     MR_ProcessPartition(*partition_number);
 }
 
 /**
- * 
+ * Map the given files to intermediate key-value pairs
+ * Parameters
+ *      num_files - The number of files in filenames
+ *      filenames - The array of files to processes
+ *      map - The Mapper function to be applied to each file
+ *      num_mappers - The number of mapper threads to create
  */
 void MR_Map(int num_files, char *filenames[], Mapper map, int num_mappers) {
     // sort files by size in ascending order
@@ -81,17 +100,22 @@ void MR_Map(int num_files, char *filenames[], Mapper map, int num_mappers) {
 }
 
 /**
- * 
+ * Reduce the intermediate key-value pairs to the output
+ * Parameters:
+ *      reducer - The Reducer function to apply to the intermediate data
+ *      num_reducers - The number of reducer threads to create
  */
 void MR_Reduce(Reducer reducer, int num_reducers) {
+    // store in global
     g_reducer = reducer;
     
+    // store args on the heap to they can be passed to workers
     int *args = new int[num_reducers];
     ThreadPool_t *reducerPool = ThreadPool_create(num_reducers);
     
     for (int i = 0; i < num_reducers; i++) {
         args[i] = i;
-        ThreadPool_add_work(reducerPool, (thread_func_t) Reducer_Entry, &args[i]);
+        ThreadPool_add_work(reducerPool, (thread_func_t) Reducer_work, &args[i]);
     }
     
     ThreadPool_destroy(reducerPool);
@@ -99,7 +123,7 @@ void MR_Reduce(Reducer reducer, int num_reducers) {
 }
 
 /**
- * Executes MapReduce
+ * Executes the MapReduce workflow
  * Parameters:
  *      num_files - The length of the filenames array
  *      filenames - The array of files to processed
@@ -126,7 +150,10 @@ void MR_Run(int num_files, char *filenames[],
  *      value - The value to associate to that key
  */
 void MR_Emit(char *key, char *value) {
+    // determines the index using the hash function in MR_Partition
     std::size_t index = MR_Partition(key, shared_data->num_partitions);
+    
+    // aquire lock before modiyfing data
     pthread_mutex_lock(&shared_data->mutex[index]);
     shared_data->partition[index].emplace(key, value);
     pthread_mutex_unlock(&shared_data->mutex[index]);
@@ -154,10 +181,18 @@ unsigned long MR_Partition(char *key, int num_partitions) {
  *      partition_number - The partition to process
  */
 void MR_ProcessPartition(int partition_number) {
+    // reference to the partition being reduced
     auto &partition = shared_data->partition[partition_number];
+
+    // reference to the iterator being processed
     auto &it = shared_data->partition_it[partition_number];
     
+    // initialize the iterator
     it = partition.cbegin();
+
+    // call reducer on each key
+    // partitions is processed by a single thread so lock is required
+    // furthermore no data is modified in this stage
     while(it != partition.cend()) {
         char *key = (char *) it->first.c_str();
         g_reducer(key, partition_number);
@@ -171,12 +206,15 @@ void MR_ProcessPartition(int partition_number) {
  *      partition_number - The partition number to look in
  */
 char *MR_GetNext(char *key, int partition_number) {
+    // get reference to the iterator and the end of the partition
     auto end = shared_data->partition[partition_number].cend();
     auto &it = shared_data->partition_it[partition_number];
 
+    // return next value
     if (it != end && it->first.compare(key) == 0) {
         return (char *) (it++)->second.c_str();
     }
+    // return NULL if no more values are available for that key
     else {
         return NULL;
     }
