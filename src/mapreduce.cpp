@@ -15,7 +15,7 @@ extern "C" {
  * Underlying data type is std::multimap
  */
 struct MRData {
-    // typedef for 
+    // typedef for intermediate data structure
     typedef std::multimap<std::string, std::string> partition_t;
 
     std::size_t num_partitions;     // the number of partitions
@@ -191,7 +191,7 @@ void MR_ProcessPartition(int partition_number) {
     it = partition.cbegin();
 
     // call reducer on each key
-    // partitions is processed by a single thread so lock is required
+    // partitions are processed by a single thread so no lock is required
     // furthermore no data is modified in this stage
     while(it != partition.cend()) {
         char *key = (char *) it->first.c_str();

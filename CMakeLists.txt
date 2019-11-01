@@ -5,7 +5,7 @@ if (${CMAKE_VERSION} VERSION_LESS 3.12)
 endif()
 
 # project settings
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 project("MapReduce" LANGUAGES C CXX)
 
 # threadpool library
