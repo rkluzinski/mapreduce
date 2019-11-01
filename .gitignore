@@ -7,5 +7,6 @@ a2-startercode/
 // eClass test data
 distwc-test-cases
 
-// build dir
-bin/
+// build files
+*.o
+wordcount
