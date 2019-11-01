@@ -29,7 +29,7 @@ threadpool.o: threadpool.c threadpool.h
 	$(CC) -o $@ -c $< $(CCFLAGS)
 
 compress:
-	@echo "TODO"
+	zip mapreduce.zip *.cpp *.c *.h Makefile README.md
 
 clean:
 	rm -f *.o wordcount
