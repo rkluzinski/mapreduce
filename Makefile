@@ -3,10 +3,10 @@ CXX			= g++
 FLAGS		= -Wall -Werror -pthread -O2 -march=native
 CCFLAGS 	= $(FLAGS) -std=c99
 CXXFLAGS	= $(FLAGS) -std=c++11
-LDFLAGS 	= -pthread
+LDFLAGS 	= -pthread -lstdc++
 
-SOURCES		= $(wildcard *.c *.cpp)
-OBJECTS		= $(SOURCES:%.c=%.o)
+SOURCES		= distwc.c mapreduce.cpp threadpool.c
+OBJECTS		= distwc.o mapreduce.o threadpool.o
 
 .PHONY: all wc compile compress clean
 
@@ -15,11 +15,11 @@ all: wc
 wc: wordcount
 
 wordcount: $(OBJECTS)
-	$(CXX) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 compile: $(OBJECTS)
 
-distw.o: distw.c mapreduce.h
+distwc.o: distwc.c mapreduce.h
 	$(CC) -o $@ -c $< $(CCFLAGS)
 
 mapreduce.o: mapreduce.cpp mapreduce.h threadpool.h

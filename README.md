@@ -19,9 +19,11 @@ A threadpool and map-reduce library written in C
 
 ### Building
 
-Follow the steps below to compile threadpool static library, the mapreduce static library, the distributed wordcount executable and the tests.
+To compile the object files and link the wordcount executable run ```make``` or ```make wc```.
 
-<!-- TODO -->
+To only compile the object file run ```make compile```.
+
+To remove all object files and the final executable run: ```make clean```.
 
 ## License
 
@@ -29,13 +31,42 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## ThreadPool
 
-The ThreadPool allows a user to create a fixed number of worker threads and distribute work among them.
+The ThreadPool allows a user to create a fixed number of worker threads and distribute work among them. The example below shows how the ThreadPool library can be used.
 
-```ThreadPool_create``` creates a new ThreadPool object and starts the specified number worker threads. The worker threads enter an idle state until work is added to the threadpool. See Worker Lifecycle below for more information.
+```C
+void some_work(void *arg) {
+    // do some work here
+}
 
-```ThreadPool_destroy``` must be called once the ThreadPool is no longer needed. This function waits for all work to processed before joining the working and freeing any memory allocated by ```ThreadPool_create```.
+void run_threadpool() {
+    // create a threadpool with 10 worker threads
+    ThreadPool_t *threadpool = ThreadPool_create(10);
 
-```ThreadPool_add_work``` adds work to the ThreadPool. If any worker threads are currently idling, this function will wake up a single thread to process the work added to the ThreadPool.
+    // add 100 jobs to the ThreadPool
+    for (int i = 0; i < 100; i++) {
+        ThreadPool_add_work(threadpool, some_work, NULL);
+    }
+
+    // wait for the threadpool to finish and free memory
+    ThreadPool_destroy(threadpool);
+}
+
+```
+
+```C
+ThreadPool_t *ThreadPool_create(int num_threads)
+``` 
+Creates a new ThreadPool object and starts ```num_threads``` worker threads. The worker threads enter an idle state until work is added to the threadpool. See Worker Lifecycle below for more information.
+
+```C
+void ThreadPool_destroy(ThreadPool_t *threadpool)
+``` 
+Waits for all work to processed before joining all worker threads and destroying the ThreadPool object.
+
+```C
+bool ThreadPool_add_work(ThreadPool_t *threadpool, thread_func_t work, void *arg)
+```
+Adds the function pointer ```work``` to be run with argument ```arg``` to the ThreadPool's work queue. If any worker threads are idling, one of them will be woken up to execute this work.
 
 ### Removed/Modified Functions
 
@@ -55,7 +86,7 @@ This section discusses the lifecycle of each worker thread, and how they manage 
 
 ```
 Thread_entry:
-    while running {
+    while thread running {
         aquire lock
         while (there is work to do) {
             get work
@@ -63,7 +94,7 @@ Thread_entry:
             run work
             aquire lock
         }
-        if (threadpool is still running) {
+        if (threadpool is running) {
             wait for more work
         }
         else {
@@ -71,25 +102,87 @@ Thread_entry:
         }
         release lock
     }
+    exit thread
 ```
 
 This algorithm ensures that the mutex is always aquired before accessing the work queue and that the worker thread idles whenever there is nothing to be done. The algorithm also guarantees that the lock will only have to be accessed once per each job completed.
 
 ## MapReduce
 
-```MR_Run``` takes an array of files, a mapper function, a reducer function along with some other arguments and executes the MapReduce workflow. The input files are mapped in parallel to a set a key-value pairs by the mapper threads. These key-value pairs are then reduced in parallel by the reducer threads.
+The MapReduce libary allows the user easily parallelize any program that can be broken down into a mapping and reducing phase. The example below (provided by the instructor) shows how to uses the MapReduce paradigm to implement a distributed wordcount (some include statements are left out).
 
-```MR_Emit``` is called by the user-defined mapper function to emits a key-value pair to the intermediate data structure. The key is mapped to a partition using the DJB2 hash function. 
+```C
+#include "mapreduce.h"
 
-**Time Complexity:** ```MR_Emit``` must ensure that the data structure stays sorted and takes O(log(n)) time in both the average and worst cases. See Intermediate Data Structure for further information about the programs internals.
+void Map(char *file_name) {
+    FILE *fp = fopen(file_name, "r");
+    assert(fp != NULL);
+    char *line = NULL;
+    size_t size = 0;
+    while (getline(&line, &size, fp) != -1) {
+        char *token, *dummy = line;
+        while ((token = strsep(&dummy, " \t\n\r")) != NULL)
+            MR_Emit(token, "1");
+    }
+    free(line);
+    fclose(fp);
+}
 
-```MR_Partition``` is an internal function used by MapReduce to compute which partition each key belongs in. It takes the key and returns the index of the partition for that key. Uses the DJB2 hash function provided with the assignment specification.
+void Reduce(char *key, int partition_number) {
+    int count = 0;
+    char *value, name[100];
+    while ((value = MR_GetNext(key, partition_number)) != NULL)
+        count++;
+    sprintf(name, "result-%d.txt", partition_number);
+    FILE *fp = fopen(name, "a");
+    printf("%s: %d\n", key, count);
+    fprintf(fp, "%s: %d\n", key, count);
+    fclose(fp);
+}
 
-```MR_ProcessPartition``` is an internal function that is called by each reducer thread. It handles calling the user-defined reducer function to reduce each partition. The function loops until it has called reduce on all keys in the partition.
+int main(int argc, char *argv[]) {
+    MR_Run(argc - 1, &(argv[1]), Map, 10, Reduce, 10);
+    return 0;
+}
+```
 
-```MR_GetNext``` is called by the user-defined reducer threads to get the next value for a given key. The function returns NULL if there are no more values for the given key. 
+To use the library, the user must define their program as a mapper function and reducer function. These functions mut have the following signatures:
 
-**Time Complexity:** ```MR_GetNext``` returns the next key in O(1) time for the average case. C++ iterators guarantee to iteration over the entire dataset in O(n) time. See Intermediate Data Structure for further information about the programs internals.
+```C
+void Map(char *filename);
+void Reduce(char *key, int partition_number);
+```
+
+The map function must emit key-value pairs by calling ```MR_Emit``` and the reducer function must retrieve key-value pairs by calling ```MR_GetNext```.
+
+```C
+void MR_Run(int num_files, char *filenames[], Mapper map, int num_mappers, Reducer concate, int num_reducers)
+``` 
+Takes an array of files, a mapper function, a reducer function along with some other arguments and executes the MapReduce workflow. The input files are mapped in parallel to a set a key-value pairs by the mapper threads. These key-value pairs are then reduced in parallel by the reducer threads.
+
+```C
+void MR_Emit(char *key, char *value)
+``` 
+Called by the user-defined mapper function to emits a key-value pair to the intermediate data structure. The key is mapped to a partition using the DJB2 hash function. 
+
+```MR_Emit``` must ensure that the data structure stays sorted and takes O(log(n)) time where n is number of key-value pairs in the parition. See Intermediate Data Structure for further information about the programs internals.
+
+```C
+unsigned long MR_Partition(char *key, int num_partitions);
+``` 
+Is an internal function used by MapReduce to compute which partition each key belongs in. It takes the key and returns the index of the partition for that key. Uses the DJB2 hash function provided with the assignment specification.
+
+```C
+void MR_ProcessPartition(int partition_number);
+```
+Is an internal function that is called by each reducer thread. It handles calling the user-defined reducer function to reduce each partition. The function loops until it has called reduce on all keys in the partition.
+
+```C
+char *MR_GetNext(char *key, int partition_number);
+``` 
+Is called by the user-defined reducer threads to get the next value for a given key. The function returns NULL if there are no more values for the given key. 
+
+```MR_GetNext``` returns the next key in O(1) time (on average). This is guaranteed because C++ iterators guarantee to iteration over the entire dataset in O(n) time where n in the number of key-value pairs in the partition. See Intermediate Data Structure for further information about the programs internals.
 
 ### Global Variables
 
