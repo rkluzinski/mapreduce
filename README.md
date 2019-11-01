@@ -44,87 +44,180 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## ThreadPool
 
-The ThreadPool allows a user to create a fixed number of worker threads and distribute work among them.
+The ThreadPool allows a user to create a fixed number of worker threads and distribute work among them. The example below shows how to use ThreadPool library.
 
-```ThreadPool_create``` creates a new ThreadPool object and starts the specified number worker threads. The worker threads enter an idle state until work is added to the threadpool. See Worker Lifecycle below for more information.
+```C
+void some_work(void *arg) {
+    // do some work here
+}
 
-```ThreadPool_destroy``` must be called once the ThreadPool is no longer needed. This function waits for all work to processed before joining the working and freeing any memory allocated by ```ThreadPool_create```.
+void run_threadpool() {
+    // create a threadpool with 10 worker threads
+    ThreadPool_t *threadpool = ThreadPool_create(10);
 
-```ThreadPool_add_work``` adds work to the ThreadPool. If any worker threads are currently idling, this function will wake up a single thread to process the work added to the ThreadPool.
+    // add 100 jobs to the ThreadPool
+    for (int i = 0; i < 100; i++) {
+        ThreadPool_add_work(threadpool, some_work, NULL);
+    }
+
+    // wait for the threadpool to finish and free memory
+    ThreadPool_destroy(threadpool);
+}
+
+```
+
+```C
+ThreadPool_t *ThreadPool_create(int num_threads)
+``` 
+Creates a new ThreadPool object and starts ```num_threads``` worker threads. Returns NULL if unable to allocate memory.
+
+```C
+void ThreadPool_destroy(ThreadPool_t *threadpool)
+``` 
+Waits for all work to processed before joining all worker threads and destroying the ThreadPool object.
+
+```C
+bool ThreadPool_add_work(ThreadPool_t *threadpool, thread_func_t work, void *arg)
+```
+Adds a function to be executed and arguments to pass to the work queue.
 
 ### Removed/Modified Functions
 
-```ThreadPool_get_work``` was removed since it was replaced by functionality implemented by the work queue. The work queue offers the ability to check if the work queue is empty, and pop the first work object. See Work Queue below for more information.
+```C
+ThreadPool_work_t *ThreadPool_get_work(ThreadPool_t *threadpool)
+``` 
+Replaced by the work queue implementation. The work queue's interface makes this function unnecessary.
 
-```Thread_run``` has been removed and replaced with ```Thread_entry``` is not the entry point for each worker thread. It takes a void pointer as an arguments to avoid needing to cast when calling ```pthread_create```. See Worker Lifecycle below for more information.
+```C
+void *Thread_run(ThreadPool_t *threadpool)
+``` 
+Replaced by ```Thread_entry```, which handles the entire lifecycle of each worker thread. For more information see Worker Lifecycle.
 
 ### Work Queue
 
-The work queue is implemented as singly-linked list. The singly-linked list supports the push and pop operations which push to the back of the queue and pops from the front. This first-in first-out ordering ensures that work is executed by threadpool in the order it is given. The operations implemented also allow for work to be added and removed in O(1) time. The queue does not lock when operations are being executed and instead relies on the worker threads to aquire the lock before modifying the work queue.
-
-Each node in the work queue stores a pointer to the function to execute, the arguments to pass to that function and a pointer to the next node in the work queue.
+The work queue is implemented as singly-linked list supporting push and pop operations. Data is accessed first-in first-out to ensure that work is executed in the order it is given. Push and pop operations take O(1) time. The queue is not thread-safe and relies on an external mutex concurrent access.
 
 ### Worker Lifecycle
 
-This section discusses the lifecycle of each worker thread, and how they manage concurrent access to the work queue efficiently. The pseudocode below describes the behaviour of the worker threads.
+The pseudocode below describes the behaviour of the worker threads. Each ThreadPool has a mutex that must be aquired before the work queue can be modifed.
 
 ```
 Thread_entry:
-    while running {
-        aquire lock
+    while thread running {
+        aquire mutex
         while (there is work to do) {
             get work
-            release lock
+            release mutex
             run work
-            aquire lock
+            aquire mutex
         }
-        if (threadpool is still running) {
+        if (threadpool is running) {
             wait for more work
         }
         else {
             stop thread
         }
-        release lock
+        release mutex
     }
+    exit thread
 ```
 
-This algorithm ensures that the mutex is always aquired before accessing the work queue and that the worker thread idles whenever there is nothing to be done. The algorithm also guarantees that the lock will only have to be accessed once per each job completed.
+Worker threads pull from the work queue until there is no more work. If there work queue is stopped they exit, otherwise they sleep until there is more work available. This algorithms ensures the lock only has to be aquired once per work executed.
 
 ## MapReduce
 
-```MR_Run``` takes an array of files, a mapper function, a reducer function along with some other arguments and executes the MapReduce workflow. The input files are mapped in parallel to a set a key-value pairs by the mapper threads. These key-value pairs are then reduced in parallel by the reducer threads.
+The MapReduce libary allows a user to write multithreaded program by defining a Map function and a Reduce function. The example below (provided by the instructor) shows how to implement a distributed wordcount program with MapReduce.
 
-```MR_Emit``` is called by the user-defined mapper function to emits a key-value pair to the intermediate data structure. The key is mapped to a partition using the DJB2 hash function. 
+```C
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include "mapreduce.h"
 
-**Time Complexity:** ```MR_Emit``` must ensure that the data structure stays sorted and takes O(log(n)) time in both the average and worst cases. See Intermediate Data Structure for further information about the programs internals.
+void Map(char *file_name) {
+    FILE *fp = fopen(file_name, "r");
+    assert(fp != NULL);
+    char *line = NULL;
+    size_t size = 0;
+    while (getline(&line, &size, fp) != -1) {
+        char *token, *dummy = line;
+        while ((token = strsep(&dummy, " \t\n\r")) != NULL)
+            MR_Emit(token, "1");
+    }
+    free(line);
+    fclose(fp);
+}
 
-```MR_Partition``` is an internal function used by MapReduce to compute which partition each key belongs in. It takes the key and returns the index of the partition for that key. Uses the DJB2 hash function provided with the assignment specification.
+void Reduce(char *key, int partition_number) {
+    int count = 0;
+    char *value, name[100];
+    while ((value = MR_GetNext(key, partition_number)) != NULL)
+        count++;
+    sprintf(name, "result-%d.txt", partition_number);
+    FILE *fp = fopen(name, "a");
+    printf("%s: %d\n", key, count);
+    fprintf(fp, "%s: %d\n", key, count);
+    fclose(fp);
+}
 
-```MR_ProcessPartition``` is an internal function that is called by each reducer thread. It handles calling the user-defined reducer function to reduce each partition. The function loops until it has called reduce on all keys in the partition.
+int main(int argc, char *argv[]) {
+    MR_Run(argc - 1, &(argv[1]), Map, 10, Reduce, 10);
+    return 0;
+}
+```
 
-```MR_GetNext``` is called by the user-defined reducer threads to get the next value for a given key. The function returns NULL if there are no more values for the given key. 
+To use the library, the user must define their program as a mapper function and reducer function with the specified signatures:
 
-**Time Complexity:** ```MR_GetNext``` returns the next key in O(1) time for the average case. C++ iterators guarantee to iteration over the entire dataset in O(n) time. See Intermediate Data Structure for further information about the programs internals.
+```C
+void Map(char *filename);
+void Reduce(char *key, int partition_number);
+```
+
+The map function must call ```MR_Emit``` and the reducer function must call ```MR_GetNext```.
+
+```C
+void MR_Run(int num_files, char *filenames[], Mapper map, int num_mappers, Reducer concate, int num_reducers)
+``` 
+This function runs the MapReduce process. The input files are mapped to an intermediate data structure using the user defined Map function and then reduced by the user defined Reduce function. 
+
+<!-- TODO: Throws an exception if any ThreadPool operations fail. -->
+
+```C
+void MR_Emit(char *key, char *value)
+``` 
+Called by the user-defined mapper function to emits a key-value pair to the intermediate data structure. Takes O(log(n)) time where n is number of key-value pairs currently in the parition.
+
+```C
+unsigned long MR_Partition(char *key, int num_partitions);
+``` 
+Internal function used to compute which partition each key belongs to. Uses the DJB2 hash function implementation provided on eClass to map a key to a partition.
+
+```C
+void MR_ProcessPartition(int partition_number);
+```
+Internal function that calls the user-defined reducer function until all keys have been reduced.
+
+```C
+char *MR_GetNext(char *key, int partition_number);
+``` 
+Called by the user-defined reducer threads to get the next value for that key. Takes O(1) time (on average) to return the next key. Returns NULL if there are no more values available. 
 
 ### Global Variables
 
-Since some of the functions specified by the MapReduce header are not passed all of the data they need by argument, some of the data must be stored as a global variable. 
-
-MapReduce stores the reducer function as a global variable so that it can be accessed by ```MR_ProcessPartition```, which only takes the partition number as an argument. 
-
-The intermediate data structure needs to be accessed by ```MR_Emit``` and ```MR_GetNext``` and is stored as a global variable.
+The reducer function and intermediate data are kept in global variables so that they can be accessed without being passed as an argument. These global variables should not be modified directly by the user program.
 
 ### Intermediate Data Structure
 
-The MapReduce library relies on the ```MRData``` intermediate data structure to store the key-value pairs emitted by the user-defined mapper threads in a thread-safe and efficient manner. Underlying ```MRData``` is an array of mutexes, multimaps and iterators. The arrays store one of each data type for every partition in the data structure.
+The MapReduce library uses multimaps for each partitions of the intermediate data structure, to efficiently store the key-value pairs emitted by the user-defined mapper function.
 
-**Thread Safety:** Mutexes are used to lock each partition when ```MR_Emit``` is inserting a new key-value pair into a partition. This guarantees that each partition can only be modified by one thread at any given time, while still allowing two threads to modify different partitions concurrently. 
+**Thread Safety:** Access to each partition is controlled by its own mutex. This allows for two partitions to be modifed concurrently. The reducing phase does not use these mutexes, as each thread processes different data, and shared data is not modified. 
 
-The reducing phase does not need any concurrency control as each of the threads are processing different data, and no shared data is being modified. 
-
-**Data Structures:** The key-value pairs are stored in a C++ STL multimap. Multimap allows for multiple values to be stored under the same key while maintaining the order of the data structure. The underlying data structure for multimap is a self-balancing binary tree, guaranteeing O(log(n)) insertion time for new keys.
-
-**Iterators:** ```std::multimap::const_iterator``` is used to iterate over each of the partitions. They guarantee iteration over the entire dataset in O(n) time, meangin each element can be accessed in order in O(1) time, on average.
+**Efficiency:** The key-value pairs are stored in a C++ STL multimap. Multimap is an ordered data structure that allows for multiple values to be stored using the same key. It guarantees an insertion time of O(log(n)), giving the time complexity of ```MR_Emit```. Iterating over the multimap is guaranteed to take O(n) time, which implies the O(1) run time of ```MR_GetNext```.
 
 ## Testing
 
@@ -132,22 +225,20 @@ To ensure that the program was fault free and met the assignments reequirements,
 
 ### Unit Testing
 
-The ThreadPool library is the backbone of the MapReduce library and therefore it was important to ensure that it was implemented correctly before proceeding with the remainder of the assignment.
+*The files for the unit testing were left out from the submission because they were not required for assignment and I did not want to include any extraneous files.*
 
-Since the ThreadPool library was implemented in C, the data structure for the work queue was implemented alongside the ThreadPool. Test cases were developed to ensure that pushing and popping from the queue conformed to first-in first-out ordering and did not cause and segmentation faults.
+The work queue was testing to ensure that pushing and popping from the queue worked properly and did not cause any segmentation faults.
 
-Once the work queue data structure was verfied by the tests, the ThreadPool library was verified next. It tested a variety of conditions like processing over 1 million jobs and having hundreds of workers sharing a slect number of jobs. These tests verified that the ThreadPool was concurrency-safe and did not deadlock.
-
-The files for the unit testing were left out from the submission because they were not required for assignment and I did not want to include any extraneous files.
+The ThreadPool was tested under number of conditions to ensure it was stable. These tests covered different numbers of workers, large amounts of work, and ensured that the ThreadPool did not deadlock or segfault.
 
 ### Integration Testing
 
-The MapReduce library was difficult design unit tests for and was instead tested using the integration tests provided by Jihoon Og on the eClass discussion forums. These tests used the MapReduce library to perform a distributed wordcount on a large number of files (approximately 5 MB). The integration tests confirmed that the MapReduce library was performing correcty and the all of the components of the program were integrated properly. It also provided a benchmark for how the efficiency of MapReduce.
+The MapReduce library was tested using the integration tests provided by Jihoon Og on eClass. These tests used the MapReduce library to perform a distributed wordcount on a large number of files (approximately 5 MB). The integration tests confirmed that MapReduce and ThreadPool behaved correctly. It also provided a way to benchmark the program.
 
 ## Valgrind
 
-Valgrind's memcheck tool was used with the various unit tests and integration tests to confirm that each of the programs individual components did not contain any memory leaks.
+Valgrind's memcheck tool was used alongside the unit tests and integration tests to confirm that each of the programs individual components did leak memory.
 
-The helgrind tool was also used to check for any undiscovered data races in the MapReduce library.
+Helgrind was also used to check for any undiscovered data races in the MapReduce library.
 
 ## Acknowledgements

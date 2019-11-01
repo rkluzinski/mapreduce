@@ -1,3 +1,4 @@
+#include <iostream>
 #include <map>          // for std::multimap
 #include <vector>       // for std::vector
 #include <unistd.h>     // for stat syscall
@@ -9,6 +10,21 @@ extern "C" {
 #include "mapreduce.h"
 #include "threadpool.h"
 }
+
+/**
+ * Exception thrown when MapReduce throws and error it cannot 
+ * recover from.
+ */
+class MapReduceException : std::exception {
+    std::string _message;
+
+public:
+    MapReduceException(std::string message): _message(message) {}
+    
+    const char *what() {
+        return _message.c_str();
+    }
+};
 
 /**
  * Holds the intermediate data produced by the Map function
@@ -90,10 +106,15 @@ void MR_Map(int num_files, char *filenames[], Mapper map, int num_mappers) {
     }
 
     ThreadPool_t *mapperPool = ThreadPool_create(num_mappers);
+    if (mapperPool == NULL) {
+        throw MapReduceException("Failed to create Mapper Pool");
+    }
 
     // push the files into the work queue in descending order
     for (auto i = sorted_files.rbegin(); i != sorted_files.rend(); i++) {
-        ThreadPool_add_work(mapperPool, (thread_func_t) map, (void *) i->second);
+        if(!ThreadPool_add_work(mapperPool, (thread_func_t) map, (void *) i->second)) {
+            throw MapReduceException("Failed to add work to ThreadPool");
+        }
     }
 
     ThreadPool_destroy(mapperPool);
@@ -108,14 +129,21 @@ void MR_Map(int num_files, char *filenames[], Mapper map, int num_mappers) {
 void MR_Reduce(Reducer reducer, int num_reducers) {
     // store in global
     g_reducer = reducer;
+
+    // TODO 
     
     // store args on the heap to they can be passed to workers
     int *args = new int[num_reducers];
     ThreadPool_t *reducerPool = ThreadPool_create(num_reducers);
+    if (reducerPool == NULL) {
+        throw MapReduceException("Failed to create Reducer Pool");
+    }
     
     for (int i = 0; i < num_reducers; i++) {
         args[i] = i;
-        ThreadPool_add_work(reducerPool, (thread_func_t) Reducer_work, &args[i]);
+        if (!ThreadPool_add_work(reducerPool, (thread_func_t) Reducer_work, &args[i])) {
+            throw MapReduceException("Failed to add work to Reducer Pool");
+        }
     }
     
     ThreadPool_destroy(reducerPool);
