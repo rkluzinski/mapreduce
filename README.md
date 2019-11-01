@@ -16,27 +16,12 @@ A threadpool and map-reduce library written in C
 
 * Linux-based Operating System
 * C++11 and C99 compatible Compiler
-* CMake
 
 ### Building
 
 Follow the steps below to compile threadpool static library, the mapreduce static library, the distributed wordcount executable and the tests.
 
-```
-mkdir bin
-cd bin
-cmake ..
-make
-```
-
-### Running Tests
-
-The tests are compiled along with the executable and can be found in the build directory. The following tests are built:
-
-```
-./test_queue
-./test_threadpool
-```
+<!-- TODO -->
 
 ## License
 
