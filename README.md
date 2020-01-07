@@ -1,8 +1,6 @@
 # MapReduce
 
-A threadpool and map-reduce library written in C
-
-** This project is not publicly accessable on GitHub.**
+A threadpool and map-reduce library written in C/C++
 
 ## Author
 
@@ -15,7 +13,7 @@ A threadpool and map-reduce library written in C
 ### Prequisites
 
 * Linux-based Operating System
-* C++11 and C99 compatible Compiler
+* C++11 and C99 compatible compiler
 * CMake
 
 ### Building
@@ -224,8 +222,6 @@ The MapReduce library uses multimaps for each partitions of the intermediate dat
 To ensure that the program was fault free and met the assignments reequirements, extensive testing was performed.
 
 ### Unit Testing
-
-*The files for the unit testing were left out from the submission because they were not required for assignment and I did not want to include any extraneous files.*
 
 The work queue was testing to ensure that pushing and popping from the queue worked properly and did not cause any segmentation faults.
 
